@@ -1,5 +1,6 @@
 from rest_framework.viewsets import ReadOnlyModelViewSet
-
+from rest_framework.response import Response
+from rest_framework.decorators import action
 from shop.models import Category, Product, Article
 from shop.serializers import CategoryDetailSerializer, CategoryListSerializer,\
     ProductDetailSerializer, ProductListSerializer, ArticleSerializer
@@ -22,6 +23,11 @@ class CategoryViewset(MultipleSerializerMixin, ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Category.objects.filter(active=True)
+    
+    @action(detail=True, methods=['post'])
+    def disable(self, request, pk=None):
+        self.get_object().disable()
+        return Response()
 
 
 class ProductViewset(MultipleSerializerMixin, ReadOnlyModelViewSet):
@@ -35,6 +41,11 @@ class ProductViewset(MultipleSerializerMixin, ReadOnlyModelViewSet):
         if category_id:
             queryset = queryset.filter(category_id=category_id)
         return queryset
+    
+    @action(detail=True, methods=['post'])
+    def disable(self, request, pk=None):
+        self.get_object().disable()
+        return Response()
 
 
 class ArticleViewset(ReadOnlyModelViewSet):
