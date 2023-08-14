@@ -1,20 +1,51 @@
-from rest_framework.serializers import ModelSerializer
+from rest_framework import serializers
 
-from .models import Category, Product, Article
+from shop.models import Category, Product, Article
 
-# path: shop/serializers.py
-class CategorySerializer(ModelSerializer):
-    class Meta:
-        model = Category
-        fields = ['id', 'name', 'description', 'active', 'date_created', 'date_updated']
+# Partie ArticleSerializer
+class ArticleSerializer(serializers.ModelSerializer):
 
-class ProductSerializer(ModelSerializer):
-    class Meta:
-        model = Product
-        fields = ['id', 'name', 'category', 'date_created', 'date_updated']
-        
-class ArticleSerializer(ModelSerializer):
     class Meta:
         model = Article
-        fields = ['id', 'name', 'price', 'product', 'date_created', 'date_updated']
-        
+        fields = ['id', 'date_created', 'date_updated', 'name', 'price', 'product']
+
+# Partie ProductListSerializer et ProductDetailSerializer
+class ProductListSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Product
+        fields = ['id', 'date_created', 'date_updated', 'name', 'category']
+
+class ProductDetailSerializer(serializers.ModelSerializer):
+
+    articles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'date_created', 'date_updated', 'name', 'category', 'articles']
+
+    def get_articles(self, instance):
+        queryset = instance.articles.filter(active=True)
+        serializer = ArticleSerializer(queryset, many=True)
+        return serializer.data
+
+# Partie CategoryListSerializer et CategoryDetailSerializer
+class CategoryListSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Category
+        fields = ['id', 'date_created', 'date_updated', 'name']
+
+
+class CategoryDetailSerializer(serializers.ModelSerializer):
+
+    products = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ['id', 'date_created', 'date_updated', 'name', 'products']
+
+    def get_products(self, instance):
+        queryset = instance.products.filter(active=True)
+        serializer = ProductDetailSerializer(queryset, many=True)
+        return serializer.data

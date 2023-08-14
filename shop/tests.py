@@ -1,43 +1,3 @@
-# from django.urls import reverse_lazy
-# from rest_framework.test import APITestCase
-
-# from shop.models import Category
-
-# class TestCategory(APITestCase): 
-    
-#     url = reverse_lazy('category-list') # Nous définissons notre URL pour les tests
-    
-#     def format_datetime(self, datetime):
-#         formatted = datetime.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-#         return formatted
-    
-#     def test_list(self):
-#         category1 = Category.objects.create(name='category 1', active=True)
-#         Category.objects.create(name='category 2', active=False)
-        
-#         response = self.client.get(self.url) # Nous récupérons la réponse de notre client HTTP
-#         self.assertEqual(response.status_code, 200) # Nous vérifions que le statut de la réponse HTTP est bien 200
-        
-#         expected = [
-#             {
-#                 'id': category1.id,
-#                 'name': category1.name,
-#                 'description': category1.description,
-#                 'active': category1.active,
-#                 'date_created': self.format_datetime(category1.date_created),
-#                 'date_updated': self.format_datetime(category1.date_updated)
-#             }
-#         ]
-#         self.assertEqual(response.json(), expected) # Nous vérifions que les données renvoyées sont celles attendues
-        
-        
-#     def test_create(self):
-#         self.assertFalse(Category.objects.exists()) # Nous vérifions qu'il n'y a pas de catégorie dans la base de données
-#         response = self.client.post(self.url, {'name': 'Tentative'}) # Nous créons une catégorie
-#         self.assertEqual(response.status_code, 405)
-#         self.assertFalse(Category.objects.exists())
-        
-        
 from django.urls import reverse_lazy, reverse
 from rest_framework.test import APITestCase
 
@@ -60,6 +20,49 @@ class ShopAPITestCase(APITestCase):
     def format_datetime(self, value):
         return value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
+    def get_article_list_data(self, articles):
+        return [
+            {
+                'id': article.pk,
+                'name': article.name,
+                'date_created': self.format_datetime(article.date_created),
+                'date_updated': self.format_datetime(article.date_updated),
+                'product': article.product_id
+            } for article in articles
+        ]
+
+    def get_product_list_data(self, products):
+        return [
+            {
+                'id': product.pk,
+                'name': product.name,
+                'date_created': self.format_datetime(product.date_created),
+                'date_updated': self.format_datetime(product.date_updated),
+                'category': product.category_id,
+                'articles': self.get_article_list_data(product.articles.filter(active=True))
+            } for product in products
+        ]
+        
+    def get_product_detail_data(self, product):
+        return {
+            'id': product.pk,
+            'name': product.name,
+            'date_created': self.format_datetime(product.date_created),
+            'date_updated': self.format_datetime(product.date_updated),
+            'category': product.category_id,
+            'articles': self.get_article_list_data(product.articles.filter(active=True))
+        }
+
+    def get_category_list_data(self, categories):
+        return [
+            {
+                'id': category.id,
+                'name': category.name,
+                'date_created': self.format_datetime(category.date_created),
+                'date_updated': self.format_datetime(category.date_updated),
+            } for category in categories
+        ]
+
 
 class TestCategory(ShopAPITestCase):
 
@@ -68,47 +71,48 @@ class TestCategory(ShopAPITestCase):
     def test_list(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
-        expected = [
-            {
-                'id': category.id,
-                'name': category.name,
-                'date_created': self.format_datetime(category.date_created),
-                'date_updated': self.format_datetime(category.date_updated),
-            } for category in [self.category, self.category_2]
-        ]
-        self.assertEqual(response.json(), expected)
+        self.assertEqual(response.json()['results'], self.get_category_list_data([self.category, self.category_2]))
+    
+    def test_detail(self):
+        # Nous utilisons l'url de détail
+        url_detail = reverse('category-detail',kwargs={'pk': self.category.pk})
+        response = self.client.get(url_detail)
+        # Nous vérifions également le status code de retour ainsi que les données reçues
+        self.assertEqual(response.status_code, 200)
+        excepted = {
+            'id': self.category.pk,
+            'name': self.category.name,
+            'date_created': self.format_datetime(self.category.date_created),
+            'date_updated': self.format_datetime(self.category.date_updated),
+            'products': self.get_product_detail_data(self.category.products.filter(active=True)),
+        }
+        self.assertEqual(excepted, response.json())
 
     def test_create(self):
         category_count = Category.objects.count()
         response = self.client.post(self.url, data={'name': 'Nouvelle catégorie'})
         self.assertEqual(response.status_code, 405)
         self.assertEqual(Category.objects.count(), category_count)
+    
+    def test_delete(self):
+        response = self.client.delete(reverse('category-detail', kwargs={'pk': self.category.pk}))
+        self.assertEqual(response.status_code, 405)
+        self.category.refresh_from_db()
 
 
 class TestProduct(ShopAPITestCase):
 
     url = reverse_lazy('product-list')
 
-    def get_product_detail_data(self, products):
-        return [
-            {
-                'id': product.pk,
-                'name': product.name,
-                'date_created': self.format_datetime(product.date_created),
-                'date_updated': self.format_datetime(product.date_updated),
-                'category': product.category_id
-            } for product in products
-        ]
-
     def test_list(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.get_product_detail_data([self.product, self.product_2]), response.json())
+        self.assertEqual(self.get_product_list_data([self.product, self.product_2]), response.json()['results'])
 
     def test_list_filter(self):
         response = self.client.get(self.url + '?category_id=%i' % self.category.pk)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.get_product_detail_data([self.product]), response.json())
+        self.assertEqual(self.get_product_list_data([self.product]), response.json()['results'])
 
     def test_create(self):
         product_count = Product.objects.count()
