@@ -1,10 +1,12 @@
-from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from shop.models import Category, Product, Article
-from shop.serializers import CategoryDetailSerializer, CategoryListSerializer,\
-    ProductDetailSerializer, ProductListSerializer, ArticleSerializer
+from shop.serializers import ArticleDetailSerializer, CategoryDetailSerializer, CategoryListSerializer,\
+    ProductDetailSerializer, ProductListSerializer, ArticleListSerializer
 
+# ModelViewSet = Celui-ci ne doit pas avoir de limitation (permet l’utilisation de l’ensemble des actions du CRUD)
+# ModelReadOnlyViewSet = Celui-ci doit avoir une limitation en lecture seule
 
 class MultipleSerializerMixin:
 
@@ -14,6 +16,33 @@ class MultipleSerializerMixin:
         if self.action == 'retrieve' and self.detail_serializer_class is not None:
             return self.detail_serializer_class
         return super().get_serializer_class()
+    
+    
+class AdminCategoryViewset(MultipleSerializerMixin, ModelViewSet):
+    
+    serializer_class = CategoryListSerializer
+    detail_serializer_class = CategoryDetailSerializer
+    
+    def get_queryset(self):
+        return Category.objects.all()
+    
+
+class AdminProductViewset(MultipleSerializerMixin, ModelViewSet):
+    
+    serializer_class = ProductListSerializer
+    detail_serializer_class = ProductDetailSerializer
+    
+    def get_queryset(self):
+        return Product.objects.all()
+    
+
+class AdminArticleViewset(MultipleSerializerMixin, ModelViewSet):
+    
+    serializer_class = ArticleListSerializer
+    detail_serializer_class = ArticleDetailSerializer
+    
+    def get_queryset(self):
+        return Article.objects.all()
 
 
 class CategoryViewset(MultipleSerializerMixin, ReadOnlyModelViewSet):
@@ -50,7 +79,7 @@ class ProductViewset(MultipleSerializerMixin, ReadOnlyModelViewSet):
 
 class ArticleViewset(ReadOnlyModelViewSet):
 
-    serializer_class = ArticleSerializer
+    serializer_class = ArticleListSerializer
 
     def get_queryset(self):
         queryset = Article.objects.filter(active=True)
